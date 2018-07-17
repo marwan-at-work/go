@@ -29,3 +29,7 @@ func webGetBytes(url string, body *[]byte) error {
 func webGetBody(url string, body *io.ReadCloser) error {
 	return web.Get(url, web.Body(body))
 }
+
+func webGetStatus(url string, status *int) error {
+	return web.Get(url, web.Non200OK(), web.Status(status))
+}

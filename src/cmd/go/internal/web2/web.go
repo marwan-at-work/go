@@ -153,6 +153,15 @@ func Header(hdr *http.Header) Option {
 	})
 }
 
+func Status(i *int) Option {
+	return optionFunc(func(g *getState) error {
+		if g.resp != nil {
+			*i = g.resp.StatusCode
+		}
+		return nil
+	})
+}
+
 func CopyHeader(hdr http.Header) http.Header {
 	if hdr == nil {
 		return nil

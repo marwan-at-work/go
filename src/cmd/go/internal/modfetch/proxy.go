@@ -19,6 +19,7 @@ import (
 )
 
 var proxyURL = os.Getenv("GOPROXY")
+var errNotFound = fmt.Errorf("module not found in proxy")
 
 func lookupProxy(path string) (Repo, error) {
 	u, err := url.Parse(proxyURL)
@@ -26,7 +27,25 @@ func lookupProxy(path string) (Repo, error) {
 		// Don't echo $GOPROXY back in case it has user:password in it (sigh).
 		return nil, fmt.Errorf("invalid $GOPROXY setting")
 	}
-	return newProxyRepo(u.String(), path), nil
+
+	p := newProxyRepo(u.String(), path)
+	var probeStatus int
+	probeURL := p.url + "/@probe"
+	err = webGetStatus(probeURL, &probeStatus)
+	if err != nil {
+		return nil, err
+	}
+
+	switch probeStatus {
+	case 200:
+		return p, nil
+	case 404:
+		return nil, errNotFound
+	default:
+		return nil, fmt.Errorf("GET %v returned unexpected status %v", probeURL, probeStatus)
+	}
+
+	panic("unreachable")
 }
 
 type proxyRepo struct {
@@ -34,7 +53,7 @@ type proxyRepo struct {
 	path string
 }
 
-func newProxyRepo(baseURL, path string) Repo {
+func newProxyRepo(baseURL, path string) *proxyRepo {
 	return &proxyRepo{strings.TrimSuffix(baseURL, "/") + "/" + pathEscape(path), path}
 }
 

@@ -207,7 +207,15 @@ func lookup(path string) (r Repo, err error) {
 		return nil, fmt.Errorf("module lookup disabled by -getmode=%s", cfg.BuildGetmode)
 	}
 	if proxyURL != "" {
-		return lookupProxy(path)
+		r, err = lookupProxy(path)
+		if err == nil {
+			return r, nil
+		} else if err != errNotFound {
+			return nil, err
+		}
+
+		// module not found in GOPROXY
+		fmt.Printf("go: switching %v to vcs\n", path)
 	}
 
 	rr, err := get.RepoRootForImportPath(path, get.PreferMod, web.Secure)
