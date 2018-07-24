@@ -24,8 +24,20 @@ func webGetBytes(url string, body *[]byte) error {
 	return web.Get(url, web.ReadAllBody(body))
 }
 
+// webGetBytesWithStatus returns the body returned by an HTTP GET, as a []byte.
+// It insists on a 200 response but sets the response code into status.
+func webGetBytesWithStatus(url string, body *[]byte, status *int) error {
+	return web.Get(url, web.ReadAllBody(body), web.Status(status))
+}
+
 // webGetBody returns the body returned by an HTTP GET, as a io.ReadCloser.
 // It insists on a 200 response.
 func webGetBody(url string, body *io.ReadCloser) error {
 	return web.Get(url, web.Body(body))
+}
+
+// webGetBodyWithStatus returns the body returned by an HTTP GET, as a io.ReadCloser.
+// It insists on a 200 response but sets the response code into status.
+func webGetBodyWithStatus(url string, body *io.ReadCloser, status *int) error {
+	return web.Get(url, web.Body(body), web.Status(status))
 }

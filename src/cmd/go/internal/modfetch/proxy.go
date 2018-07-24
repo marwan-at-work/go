@@ -85,7 +85,7 @@ cached module versions with GOPROXY=https://example.com/proxy.
 
 var proxyURL = os.Getenv("GOPROXY")
 
-func lookupProxy(path string) (Repo, error) {
+func lookupProxy(path string, alt Repo) (Repo, error) {
 	if strings.Contains(proxyURL, ",") {
 		return nil, fmt.Errorf("invalid $GOPROXY setting: cannot have comma")
 	}
@@ -94,20 +94,25 @@ func lookupProxy(path string) (Repo, error) {
 		// Don't echo $GOPROXY back in case it has user:password in it (sigh).
 		return nil, fmt.Errorf("invalid $GOPROXY setting: malformed URL or invalid scheme (must be http, https, file)")
 	}
-	return newProxyRepo(u.String(), path)
+	return newProxyRepo(u.String(), path, alt)
 }
 
 type proxyRepo struct {
 	url  string
 	path string
+	alt  Repo
 }
 
-func newProxyRepo(baseURL, path string) (Repo, error) {
+func newProxyRepo(baseURL, path string, alt Repo) (Repo, error) {
 	enc, err := module.EncodePath(path)
 	if err != nil {
 		return nil, err
 	}
-	return &proxyRepo{strings.TrimSuffix(baseURL, "/") + "/" + pathEscape(enc), path}, nil
+	return &proxyRepo{
+		url:  strings.TrimSuffix(baseURL, "/") + "/" + pathEscape(enc),
+		path: path,
+		alt:  alt,
+	}, nil
 }
 
 func (p *proxyRepo) ModulePath() string {
@@ -116,8 +121,12 @@ func (p *proxyRepo) ModulePath() string {
 
 func (p *proxyRepo) Versions(prefix string) ([]string, error) {
 	var data []byte
-	err := webGetBytes(p.url+"/@v/list", &data)
+	var status int
+	err := webGetBytesWithStatus(p.url+"/@v/list", &data, &status)
 	if err != nil {
+		if status == 404 && p.alt != nil {
+			return p.alt.Versions(prefix)
+		}
 		return nil, err
 	}
 	var list []string
@@ -163,12 +172,16 @@ func (p *proxyRepo) latest() (*RevInfo, error) {
 
 func (p *proxyRepo) Stat(rev string) (*RevInfo, error) {
 	var data []byte
+	var status int
 	encRev, err := module.EncodeVersion(rev)
 	if err != nil {
 		return nil, err
 	}
-	err = webGetBytes(p.url+"/@v/"+pathEscape(encRev)+".info", &data)
+	err = webGetBytesWithStatus(p.url+"/@v/"+pathEscape(encRev)+".info", &data, &status)
 	if err != nil {
+		if status == 404 && p.alt != nil {
+			return p.alt.Stat(rev)
+		}
 		return nil, err
 	}
 	info := new(RevInfo)
@@ -179,10 +192,14 @@ func (p *proxyRepo) Stat(rev string) (*RevInfo, error) {
 }
 
 func (p *proxyRepo) Latest() (*RevInfo, error) {
+	var status int
 	var data []byte
 	u := p.url + "/@latest"
-	err := webGetBytes(u, &data)
+	err := webGetBytesWithStatus(u, &data, &status)
 	if err != nil {
+		if status == 404 && p.alt != nil {
+			return p.alt.Latest()
+		}
 		// TODO return err if not 404
 		return p.latest()
 	}
@@ -194,26 +211,34 @@ func (p *proxyRepo) Latest() (*RevInfo, error) {
 }
 
 func (p *proxyRepo) GoMod(version string) ([]byte, error) {
+	var status int
 	var data []byte
 	encVer, err := module.EncodeVersion(version)
 	if err != nil {
 		return nil, err
 	}
-	err = webGetBytes(p.url+"/@v/"+pathEscape(encVer)+".mod", &data)
+	err = webGetBytesWithStatus(p.url+"/@v/"+pathEscape(encVer)+".mod", &data, &status)
 	if err != nil {
+		if status == 404 && p.alt != nil {
+			return p.alt.GoMod(version)
+		}
 		return nil, err
 	}
 	return data, nil
 }
 
 func (p *proxyRepo) Zip(version string, tmpdir string) (tmpfile string, err error) {
+	var status int
 	var body io.ReadCloser
 	encVer, err := module.EncodeVersion(version)
 	if err != nil {
 		return "", err
 	}
-	err = webGetBody(p.url+"/@v/"+pathEscape(encVer)+".zip", &body)
+	err = webGetBodyWithStatus(p.url+"/@v/"+pathEscape(encVer)+".zip", &body, &status)
 	if err != nil {
+		if status == 404 && p.alt != nil {
+			return p.alt.Zip(version, tmpdir)
+		}
 		return "", err
 	}
 	defer body.Close()

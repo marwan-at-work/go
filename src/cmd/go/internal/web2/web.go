@@ -153,6 +153,15 @@ func Header(hdr *http.Header) Option {
 	})
 }
 
+func Status(i *int) Option {
+	return optionFunc(func(g *getState) error {
+		if g.resp != nil {
+			*i = g.resp.StatusCode
+		}
+		return nil
+	})
+}
+
 func CopyHeader(hdr http.Header) http.Header {
 	if hdr == nil {
 		return nil
@@ -265,6 +274,12 @@ func Get(url string, options ...Option) error {
 		}
 	}()
 
+	for _, o := range options {
+		if err := o.option(g); err != nil {
+			return err
+		}
+	}
+
 	if g.resp.StatusCode == 403 && req.URL.Host == "api.github.com" && !havePassword("api.github.com") {
 		base.Errorf("%s", githubMessage)
 	}
@@ -272,11 +287,6 @@ func Get(url string, options ...Option) error {
 		return fmt.Errorf("unexpected status (%s): %v", url, g.resp.Status)
 	}
 
-	for _, o := range options {
-		if err := o.option(g); err != nil {
-			return err
-		}
-	}
 	return err
 }
 

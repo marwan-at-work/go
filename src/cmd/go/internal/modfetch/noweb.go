@@ -22,3 +22,7 @@ func webGetBytes(url string, body *[]byte) error {
 func webGetBody(url string, body *io.ReadCloser) error {
 	return fmt.Errorf("no network in go_bootstrap")
 }
+
+func webGetStatus(url string, status *int) error {
+	return fmt.Errorf("no network in go_bootstrap")
+}
