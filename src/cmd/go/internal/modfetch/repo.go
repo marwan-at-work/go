@@ -212,9 +212,6 @@ func lookup(path string) (r Repo, err error) {
 	if proxyURL == "off" {
 		return nil, fmt.Errorf("module lookup disabled by GOPROXY=%s", proxyURL)
 	}
-	if proxyURL != "" && proxyURL != "direct" {
-		return lookupProxy(path)
-	}
 
 	security := web.Secure
 	if get.Insecure {
@@ -228,14 +225,21 @@ func lookup(path string) (r Repo, err error) {
 
 	if rr.VCS == "mod" {
 		// Fetch module from proxy with base URL rr.Repo.
-		return newProxyRepo(rr.Repo, path)
+		return newProxyRepo(rr.Repo, path, nil)
 	}
 
 	code, err := lookupCodeRepo(rr)
 	if err != nil {
 		return nil, err
 	}
-	return newCodeRepo(code, rr.Root, path)
+	r, err = newCodeRepo(code, rr.Root, path)
+	if err != nil {
+		return nil, err
+	}
+	if proxyURL != "" && proxyURL != "direct" {
+		return lookupProxy(path, r)
+	}
+	return r, nil
 }
 
 func lookupCodeRepo(rr *get.RepoRoot) (codehost.Repo, error) {
