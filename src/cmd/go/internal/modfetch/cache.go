@@ -230,7 +230,10 @@ func (r *cachingRepo) GoMod(version string) ([]byte, error) {
 
 		text, err = r.r.GoMod(version)
 		if err == nil {
-			checkGoMod(r.path, version, text)
+			err = checkGoMod(r.path, version, text)
+			if err != nil {
+				return cached{text, err}
+			}
 			if err := writeDiskGoMod(file, text); err != nil {
 				fmt.Fprintf(os.Stderr, "go: writing go.mod cache: %v\n", err)
 			}
@@ -490,7 +493,9 @@ func readDiskGoMod(path, rev string) (file string, data []byte, err error) {
 	}
 
 	if err == nil {
-		checkGoMod(path, rev, data)
+		if err := checkGoMod(path, rev, data); err != nil {
+			return "", nil, err
+		}
 	}
 
 	return file, data, err
